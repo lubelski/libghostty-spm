@@ -140,6 +140,22 @@ automatic integration. A host-managed backend must preserve or emit
 equivalent OSC 133 prompt markers. Arbitrary Ghostty actions remain available
 through `performBindingAction(_:)`.
 
+### Window Actions from Keybinds
+
+Ghostty's default macOS keybinds include window-level actions the library
+cannot perform on its own: Cmd+N `new_window`, Cmd+T `new_tab`, Cmd+D
+`new_split:right`, Cmd+Shift+W `close_window`, Cmd+Q `quit`, and
+`toggle_fullscreen`. The surface view reports a bound key as handled before
+the menu bar sees it, so a host that keeps those bindings performs them
+through `TerminalSurfaceWindowActionDelegate` (one method,
+`terminalDidRequestWindowAction(_:)`, with a `TerminalWindowAction` that
+carries the split direction or close-tab mode) or, in SwiftUI,
+`TerminalViewState.onWindowAction`. The core addresses `quit` and `close_all_windows` to the app rather
+than to a surface; those reach `TerminalController.windowActionDelegate`
+(set it to the same object). The library reports an action as handled to
+the core when a delegate is there and drops it otherwise. A host that prefers its menu bar for these keys unbinds them in
+the config instead: `keybind = super+n=unbind`.
+
 ### Pasting and Dropping Files
 
 A paste reads the pasteboard the way Ghostty's macOS app does: URLs first —

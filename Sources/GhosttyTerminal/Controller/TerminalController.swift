@@ -99,6 +99,13 @@ public final class TerminalController {
     var baseConfigSource: ConfigSource = .none
     var baseConfigTemplate: String = ""
 
+    /// Receives window actions the core addresses to the app rather than
+    /// to a surface. `quit` and `close_all_windows` arrive here; a
+    /// surface-targeted action (`new_window` from a keybind in a surface)
+    /// goes to that surface view's delegate instead. A host that drives
+    /// one controller per surface sets the same object on both.
+    public weak var windowActionDelegate: (any TerminalSurfaceWindowActionDelegate)?
+
     /// Per-session configuration overrides (e.g. font size changes).
     public private(set) var terminalConfiguration: TerminalConfiguration
 
