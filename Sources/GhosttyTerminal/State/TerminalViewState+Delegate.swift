@@ -21,8 +21,13 @@ extension TerminalViewState:
     TerminalSurfaceLifecycleDelegate,
     TerminalSurfaceClipboardConfirmationDelegate,
     TerminalSurfaceColorChangeDelegate,
-    TerminalSurfaceFontSizeDelegate
+    TerminalSurfaceFontSizeDelegate,
+    TerminalSurfaceWindowActionDelegate
 {
+    public func terminalDidRequestWindowAction(_ action: TerminalWindowAction) {
+        onWindowAction?(action)
+    }
+
     /// Applies a change to this state on the main queue's next turn.
     ///
     /// Every `@Published` property below goes through here, and the reason is

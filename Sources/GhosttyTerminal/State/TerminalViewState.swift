@@ -78,6 +78,9 @@ public final class TerminalViewState: ObservableObject {
 
     @Published public var configuration: TerminalSurfaceOptions = .init()
     public var onClose: ((Bool) -> Void)?
+    /// A window-level request from a keybind (new window, tab or split; close;
+    /// quit; fullscreen). nil drops it; see ``TerminalWindowAction``.
+    public var onWindowAction: ((TerminalWindowAction) -> Void)?
     @Published public internal(set) var controller: TerminalController
 
     #if canImport(UIKit)

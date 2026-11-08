@@ -12,6 +12,13 @@ import GhosttyKit
     import AppKit
 #endif
 
+extension TerminalController {
+    /// Runs the runtime action callback as the core would. Tests only.
+    func deliverActionForTesting(target: ghostty_target_s, action: ghostty_action_s) -> Bool {
+        TerminalCallbacks.action(appPtr: app, target: target, action: action)
+    }
+}
+
 private enum TerminalCallbacks {
     static func wakeup(userdata: UnsafeMutableRawPointer?) {
         guard let userdata else { return }
@@ -36,7 +43,23 @@ private enum TerminalCallbacks {
         action: ghostty_action_s,
     ) -> Bool {
         guard let appPtr else { return false }
-        guard ghostty_app_userdata(appPtr) != nil else { return false }
+        guard let userdata = ghostty_app_userdata(appPtr) else { return false }
+        if target.tag == GHOSTTY_TARGET_APP {
+            // The core addresses quit and close_all_windows to the app.
+            guard let windowAction = TerminalWindowAction(action) else { return false }
+            let controller = Unmanaged<TerminalController>.fromOpaque(userdata).takeUnretainedValue()
+            let deliver: @MainActor () -> Bool = {
+                guard let delegate = controller.windowActionDelegate else { return false }
+                TerminalDebugLog.log(.actions, "callback action=window(app) \(windowAction)")
+                delegate.terminalDidRequestWindowAction(windowAction)
+                return true
+            }
+            guard Thread.isMainThread else {
+                terminalRunOnMain { _ = deliver() }
+                return false
+            }
+            return MainActor.assumeIsolated { deliver() }
+        }
         guard target.tag == GHOSTTY_TARGET_SURFACE else { return false }
         guard let surfacePtr = target.target.surface else { return false }
         guard let bridgePtr = ghostty_surface_userdata(surfacePtr) else { return false }
@@ -49,12 +72,16 @@ private enum TerminalCallbacks {
             return false
         }
         return MainActor.assumeIsolated {
+            let windowHandled = bridge.handlesWindowAction(action)
             bridge.handleAction(action)
             // Core spawns /usr/bin/open for an open_url reported unhandled,
             // so a host delegate that took the URL is reported as handling
-            // it. Both open_url emitters run on the main thread.
-            return action.tag == GHOSTTY_ACTION_OPEN_URL
-                && bridge.delegate is any TerminalSurfaceOpenURLDelegate
+            // it. Both open_url emitters run on the main thread. A window
+            // action (new_window, quit, ...) is handled when a delegate
+            // adopts TerminalSurfaceWindowActionDelegate.
+            return windowHandled
+                || (action.tag == GHOSTTY_ACTION_OPEN_URL
+                    && bridge.delegate is any TerminalSurfaceOpenURLDelegate)
         }
     }
 

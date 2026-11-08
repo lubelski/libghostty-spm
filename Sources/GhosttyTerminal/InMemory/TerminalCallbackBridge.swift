@@ -210,11 +210,24 @@ final class TerminalCallbackBridge {
                 .terminalDidUpdateSearchSelected(selected < 0 ? nil : Int(selected))
 
         default:
+            if let windowAction = TerminalWindowAction(action) {
+                TerminalDebugLog.log(.actions, "callback action=window \(windowAction)")
+                (delegate as? any TerminalSurfaceWindowActionDelegate)?
+                    .terminalDidRequestWindowAction(windowAction)
+                return
+            }
             TerminalDebugLog.log(
                 .actions,
                 "callback action=\(TerminalDebugLog.describe(action.tag))",
             )
         }
+    }
+
+    /// True when a delegate will perform this window action, so the core
+    /// hears it was handled instead of treating the keybind as unanswered.
+    func handlesWindowAction(_ action: ghostty_action_s) -> Bool {
+        TerminalWindowAction(action) != nil
+            && delegate is any TerminalSurfaceWindowActionDelegate
     }
 
     func handleClose(processAlive: Bool) {

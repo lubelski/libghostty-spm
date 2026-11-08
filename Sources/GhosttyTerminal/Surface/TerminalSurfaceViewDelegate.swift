@@ -215,6 +215,76 @@ public protocol TerminalSurfaceOpenURLDelegate: TerminalSurfaceViewDelegate {
     func terminalDidRequestOpenURL(_ url: String, kind: TerminalOpenURLKind)
 }
 
+/// A window-level request from a Ghostty keybind or binding action that the
+/// library cannot carry out itself: it owns one surface, not the window, tab
+/// or split layout around it. With the default macOS keybinds, Cmd+N emits
+/// `.newWindow`, Cmd+T `.newTab`, Cmd+D `.newSplit(.right)`, Cmd+Shift+W
+/// `.closeWindow`, Cmd+Q `.quit`, and so on. The surface view reports a bound
+/// key as handled before the menu bar sees it, so a host that keeps those
+/// bindings performs them here. A host that would rather route them through
+/// its menu unbinds them in the config (`keybind = super+n=unbind`).
+public enum TerminalWindowAction: Sendable, Hashable {
+    public enum SplitDirection: Sendable, Hashable {
+        case right, down, left, up
+
+        init(_ raw: ghostty_action_split_direction_e) {
+            switch raw {
+            case GHOSTTY_SPLIT_DIRECTION_DOWN: self = .down
+            case GHOSTTY_SPLIT_DIRECTION_LEFT: self = .left
+            case GHOSTTY_SPLIT_DIRECTION_UP: self = .up
+            default: self = .right
+            }
+        }
+    }
+
+    public enum CloseTabMode: Sendable, Hashable {
+        case this, other, right
+
+        init(_ raw: ghostty_action_close_tab_mode_e) {
+            switch raw {
+            case GHOSTTY_ACTION_CLOSE_TAB_MODE_OTHER: self = .other
+            case GHOSTTY_ACTION_CLOSE_TAB_MODE_RIGHT: self = .right
+            default: self = .this
+            }
+        }
+    }
+
+    case newWindow
+    case newTab
+    case newSplit(SplitDirection)
+    case closeWindow
+    case closeTab(CloseTabMode)
+    case closeAllWindows
+    case quit
+    case toggleFullscreen
+    case toggleMaximize
+
+    /// nil for a tag that is not a window action.
+    init?(_ action: ghostty_action_s) {
+        switch action.tag {
+        case GHOSTTY_ACTION_NEW_WINDOW: self = .newWindow
+        case GHOSTTY_ACTION_NEW_TAB: self = .newTab
+        case GHOSTTY_ACTION_NEW_SPLIT: self = .newSplit(SplitDirection(action.action.new_split))
+        case GHOSTTY_ACTION_CLOSE_WINDOW: self = .closeWindow
+        case GHOSTTY_ACTION_CLOSE_TAB: self = .closeTab(CloseTabMode(action.action.close_tab_mode))
+        case GHOSTTY_ACTION_CLOSE_ALL_WINDOWS: self = .closeAllWindows
+        case GHOSTTY_ACTION_QUIT: self = .quit
+        case GHOSTTY_ACTION_TOGGLE_FULLSCREEN: self = .toggleFullscreen
+        case GHOSTTY_ACTION_TOGGLE_MAXIMIZE: self = .toggleMaximize
+        default: return nil
+        }
+    }
+}
+
+/// Window-level actions (new window, tab or split; close; quit; fullscreen)
+/// that a keybind or `performBindingAction` asked for. The host performs them;
+/// the library reports the action as handled to the core when a delegate
+/// adopts this protocol, and otherwise drops it.
+@MainActor
+public protocol TerminalSurfaceWindowActionDelegate: TerminalSurfaceViewDelegate {
+    func terminalDidRequestWindowAction(_ action: TerminalWindowAction)
+}
+
 /// Mouse hovered over a recognized hyperlink. nil = hover ended / link lost.
 @MainActor
 public protocol TerminalSurfaceHoverLinkDelegate: TerminalSurfaceViewDelegate {
